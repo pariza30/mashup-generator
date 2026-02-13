@@ -1,0 +1,10 @@
+venv/
+downloads/
+clips/
+output/
+*.mp3
+*.wav
+*.zip
+__pycache__/
+.env
+
