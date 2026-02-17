@@ -3,6 +3,11 @@ import os, zipfile, smtplib, yt_dlp
 from email.message import EmailMessage
 from moviepy.audio.io.AudioFileClip import AudioFileClip
 from pydub import AudioSegment
+import os
+import imageio_ffmpeg
+
+AudioSegment.converter = imageio_ffmpeg.get_ffmpeg_exe()
+
 
 app = Flask(__name__)
 
