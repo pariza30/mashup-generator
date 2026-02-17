@@ -1,7 +1,6 @@
 Flask
 yt-dlp
 moviepy
-pydub
 imageio
 imageio-ffmpeg
 gunicorn

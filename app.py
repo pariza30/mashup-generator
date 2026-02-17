@@ -2,14 +2,6 @@ from flask import Flask, render_template, request
 import os, zipfile, smtplib, yt_dlp
 from email.message import EmailMessage
 from moviepy.audio.io.AudioFileClip import AudioFileClip
-import imageio_ffmpeg
-from pydub import AudioSegment
-
-AudioSegment.converter = imageio_ffmpeg.get_ffmpeg_exe()
-AudioSegment.ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
-AudioSegment.ffprobe = imageio_ffmpeg.get_ffmpeg_exe()
-
-
 
 app = Flask(__name__)
 
@@ -36,7 +28,7 @@ def download_songs(singer, count):
 
 
 # ---------------------------------------
-# CREATE CLIPS
+# CREATE CLIPS (MoviePy only)
 # ---------------------------------------
 def create_clips(duration):
     os.makedirs(CLIP_DIR, exist_ok=True)
@@ -44,29 +36,28 @@ def create_clips(duration):
     for file in os.listdir(DOWNLOAD_DIR):
         path = os.path.join(DOWNLOAD_DIR, file)
 
-        audio = AudioFileClip(path)
-        wav_path = path + ".wav"
-        audio.write_audiofile(wav_path, logger=None)
+        audio = AudioFileClip(path).subclip(0, duration)
+
+        clip_path = os.path.join(CLIP_DIR, "clip_" + file + ".mp3")
+        audio.write_audiofile(clip_path, logger=None)
         audio.close()
-
-        sound = AudioSegment.from_file(wav_path)
-        clip = sound[:duration * 1000]
-
-        clip.export(os.path.join(CLIP_DIR, "clip_" + file + ".mp3"), format="mp3")
-
-        os.remove(wav_path)
 
 
 # ---------------------------------------
 # MERGE CLIPS
 # ---------------------------------------
 def merge_clips():
-    combined = AudioSegment.empty()
+    clips = []
 
     for file in sorted(os.listdir(CLIP_DIR)):
-        combined += AudioSegment.from_file(os.path.join(CLIP_DIR, file))
+        clips.append(AudioFileClip(os.path.join(CLIP_DIR, file)))
 
-    combined.export(OUTPUT_FILE, format="mp3")
+    final = clips[0]
+
+    for clip in clips[1:]:
+        final = final.append(clip)
+
+    final.write_audiofile(OUTPUT_FILE, logger=None)
 
 
 # ---------------------------------------
@@ -87,11 +78,11 @@ def create_zip():
 # ---------------------------------------
 def send_email(receiver_email, zip_path):
 
-    sender_email = "pkandol_be23@thapar.edu"
-    app_password = "poaadlxrnbldmjdu"
+    sender_email = "yourgmail@gmail.com"
+    app_password = "your_app_password"
 
     msg = EmailMessage()
-    msg["Subject"] = "Your Mashup File 🎵"
+    msg["Subject"] = "Your Mashup File"
     msg["From"] = sender_email
     msg["To"] = receiver_email
     msg.set_content("Enjoy your auto-generated mashup!")
@@ -120,19 +111,17 @@ def index():
             singer = request.form.get("singer")
             email = request.form.get("email")
 
-            # numeric inputs
             try:
                 videos = int(request.form.get("videos"))
                 duration = int(request.form.get("duration"))
             except:
-                return "❌ Videos and duration must be numbers."
+                return "Videos and duration must be numbers."
 
-            # validation
             if videos <= 10:
-                return "❌ Number of videos must be greater than 10."
+                return "Number of videos must be greater than 10."
 
             if duration <= 20:
-                return "❌ Duration must be greater than 20 seconds."
+                return "Duration must be greater than 20 seconds."
 
             # clean old files
             for folder in [DOWNLOAD_DIR, CLIP_DIR]:
@@ -140,24 +129,21 @@ def index():
                     for f in os.listdir(folder):
                         os.remove(os.path.join(folder, f))
 
-            # process
             download_songs(singer, videos)
             create_clips(duration)
             merge_clips()
             zip_path = create_zip()
             send_email(email, zip_path)
 
-            return "✅ Mashup created & sent to email!"
+            return "Mashup created and sent to email!"
 
         except Exception as e:
-            return f"❌ Error: {str(e)}"
+            return f"Error: {str(e)}"
 
     return render_template("index.html")
 
 
-import os
-
+# Render port config
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
